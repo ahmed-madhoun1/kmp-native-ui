@@ -1,0 +1,32 @@
+workflows:
+  ios-kmp-windows-user:
+    name: Build Unsigned iOS IPA for Windows Sideloading
+    max_build_duration: 40
+    instance_type: mac_mini_m2
+    environment:
+      vars:
+        # Pointing to the main outer folder containing your .xcodeproj file
+        XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
+        XCODE_SCHEME: "iosApp"
+    scripts:
+      - name: Build KMP Shared Module
+        script: |
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+      - name: Build Unsigned iOS App Binary
+        script: |
+          xcodebuild -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            BUILD_DIR=build/ios/unsigned
+      - name: Package into IPA Container
+        script: |
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/unsigned/Release-iphoneos/*.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -r unsigned_app.ipa Payload
+    artifacts:
+      - build/ios/ipa/*.ipa
