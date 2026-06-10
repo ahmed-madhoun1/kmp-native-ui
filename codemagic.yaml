@@ -2,16 +2,16 @@ workflows:
   ios-kmp-windows-user:
     name: Build Unsigned iOS IPA for Windows Sideloading
     max_build_duration: 40
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     environment:
       vars:
-        # Pointing to the main outer folder containing your .xcodeproj file
-        XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
+        XCODE_PROJECT: "iosApp/iosApp.xcodeproj" 
         XCODE_SCHEME: "iosApp"
     scripts:
-      - name: Build KMP Shared Module
+      - name: Initialize Gradle Wrapper
         script: |
-          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+          chmod +x gradlew
+          ./gradlew --version
       - name: Build Unsigned iOS App Binary
         script: |
           xcodebuild -project "$XCODE_PROJECT" \
