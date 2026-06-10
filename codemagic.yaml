@@ -12,6 +12,12 @@ workflows:
         script: |
           chmod +x gradlew
           ./gradlew --version
+      - name: Resolve Swift Package Dependencies
+        script: |
+          # Force Xcode to download and link SPM packages before building
+          xcodebuild -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -resolvePackageDependencies
       - name: Build Unsigned iOS App Binary
         script: |
           xcodebuild -project "$XCODE_PROJECT" \
