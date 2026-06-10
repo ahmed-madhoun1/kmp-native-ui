@@ -61,9 +61,7 @@ struct ListView: View {
                 }
                 // Native Profile Sheet populated by shared KMP UserProfile
                 .sheet(isPresented: $showProfileSheet) {
-                    if let profile = viewModel.userProfile {
-                        ProfileSheet(profile: profile)
-                    }
+                    ProfileSheet(profile: viewModel.userProfile)
                 }
             }
             .tabItem {
