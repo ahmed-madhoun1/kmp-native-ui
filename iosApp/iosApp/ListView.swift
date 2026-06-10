@@ -10,38 +10,126 @@ struct ListView: View {
     // Injects the shared KMP ViewModel and marks it as observable for SwiftUI
     @StateViewModel
     var viewModel = ListViewModel(
-        // Fetches the repository via the Koin wrapper class defined in the shared iOS code
         museumRepository: KoinDependencies().museumRepository
     )
 
-    // Defines a flexible grid layout with a minimum width of 120 points per column
     let columns = [
         GridItem(.adaptive(minimum: 120), alignment: .top)
     ]
+    
+    // State to handle the Profile sheet presentation
+    @State private var showProfileSheet = false
 
     var body: some View {
-        ZStack {
-            // Check if the ViewModel has fetched any objects
-            if !viewModel.objects.isEmpty {
-                // Native iOS navigation stack
-                NavigationStack {
-                    ScrollView {
-                        // Native lazy loading grid
-                        LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
-                            ForEach(viewModel.objects, id: \.self) { item in
-                                // Native navigation link passing the object ID to the DetailView
-                                NavigationLink(destination: DetailView(objectId: item.objectID)) {
-                                    ObjectFrame(obj: item)
+        // Native iOS TabView (Bottom Navigation)
+        TabView {
+            // First Tab: Home
+            NavigationStack {
+                ZStack {
+                    if !viewModel.objects.isEmpty {
+                        ScrollView {
+                            LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
+                                ForEach(viewModel.objects, id: \.self) { item in
+                                    NavigationLink(destination: DetailView(objectId: item.objectID)) {
+                                        ObjectFrame(
+                                            obj: item,
+                                            isLiked: viewModel.likedObjectIds.contains { $0.intValue == item.objectID },
+                                            onToggleLike: {
+                                                viewModel.toggleLike(objectId: item.objectID)
+                                            }
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .buttonStyle(PlainButtonStyle()) // Removes default button styling
                             }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
+                    } else {
+                        Text("No data available")
                     }
                 }
-            } else {
-                // Loading or empty state
-                Text("No data available")
+                .navigationTitle("KMP Native UI")
+                .toolbar {
+                    // Profile button in the top right to open the native sheet
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            showProfileSheet = true
+                        }) {
+                            Image(systemName: "person.crop.circle")
+                        }
+                    }
+                }
+                // Native Profile Sheet populated by shared KMP UserProfile
+                .sheet(isPresented: $showProfileSheet) {
+                    if let profile = viewModel.userProfile {
+                        ProfileSheet(profile: profile)
+                    }
+                }
+            }
+            .tabItem {
+                Label("Home", systemImage: "house")
+            }
+
+            // Second Tab: Settings
+            NavigationStack {
+                Text("Settings Tab")
+                    .font(.largeTitle)
+                    .navigationTitle("Settings")
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gear")
+            }
+        }
+    }
+}
+
+/**
+ * A native iOS sheet view representing the User Profile.
+ * This consumes the exact same UserProfile state from KMP as the Android Drawer.
+ */
+struct ProfileSheet: View {
+    @Environment(\.presentationMode) var presentationMode
+    let profile: UserProfile
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack(spacing: 16) {
+                        AsyncImage(url: URL(string: profile.avatarUrl)) { phase in
+                            if let image = phase.image {
+                                image.resizable().scaledToFill()
+                            } else {
+                                ProgressView()
+                            }
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipShape(Circle())
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(profile.name)
+                                .font(.headline)
+                            Text(profile.email)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+                
+                Section {
+                    Button("My Profile") { }
+                    Button("Favorites") { }
+                }
+            }
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
             }
         }
     }
@@ -51,47 +139,58 @@ struct ListView: View {
  * A reusable SwiftUI view component that displays a single museum object in a grid cell.
  */
 struct ObjectFrame: View {
-    // The shared Kotlin data model representing the object
     let obj: MuseumObject
+    let isLiked: Bool
+    let onToggleLike: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            GeometryReader { geometry in
-                // Asynchronously loads the image from the remote URL
-                AsyncImage(url: URL(string: obj.primaryImageSmall)) { phase in
-                    switch phase {
-                    case .empty:
-                        // Shows a loading indicator while the image is being fetched
-                        ProgressView()
-                            .frame(width: geometry.size.width, height: geometry.size.width)
-                    case .success(let image):
-                        // Displays the loaded image filling the grid cell proportionally
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.width)
-                            .clipped()
-                            .aspectRatio(1, contentMode: .fill)
-                    default:
-                        // Fallback view if the image fails to load
-                        EmptyView()
-                            .frame(width: geometry.size.width, height: geometry.size.width)
+            ZStack(alignment: .topTrailing) {
+                GeometryReader { geometry in
+                    AsyncImage(url: URL(string: obj.primaryImageSmall)) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .frame(width: geometry.size.width, height: geometry.size.width)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: geometry.size.width, height: geometry.size.width)
+                                .clipped()
+                        default:
+                            EmptyView()
+                                .frame(width: geometry.size.width, height: geometry.size.width)
+                        }
                     }
                 }
+                .aspectRatio(1, contentMode: .fit)
+                .cornerRadius(12)
+                
+                // Native UI Toggle Button for iOS
+                Button(action: {
+                    onToggleLike()
+                }) {
+                    Image(systemName: isLiked ? "heart.fill" : "heart")
+                        .foregroundColor(isLiked ? .red : .white)
+                        .padding(8)
+                        .background(Color.black.opacity(0.3))
+                        .clipShape(Circle())
+                }
+                .padding(8)
             }
-            .aspectRatio(1, contentMode: .fit)
 
-            // Object title
             Text(obj.title)
                 .font(.headline)
+                .lineLimit(1)
 
-            // Artist name
             Text(obj.artistDisplayName)
                 .font(.subheadline)
+                .lineLimit(1)
 
-            // Creation date
             Text(obj.objectDate)
                 .font(.caption)
+                .lineLimit(1)
         }
     }
 }
