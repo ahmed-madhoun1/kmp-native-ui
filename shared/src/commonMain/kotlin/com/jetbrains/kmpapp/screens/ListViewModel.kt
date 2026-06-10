@@ -8,9 +8,24 @@ import com.rickclephas.kmp.nativecoroutines.NativeCoroutinesState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 
+/**
+ * ViewModel for the List Screen.
+ * Inherits from [ViewModel] provided by KMP-ObservableViewModel to support both
+ * Compose (Android) and SwiftUI (iOS) natively.
+ *
+ * @param museumRepository The repository used to fetch the list of objects.
+ */
 class ListViewModel(museumRepository: MuseumRepository) : ViewModel() {
+    
+    /**
+     * A state flow containing the list of [MuseumObject]s.
+     * This exposes the repository's continuous flow as a [StateFlow] scoped to this ViewModel.
+     * Annotated with [@NativeCoroutinesState] to automatically bridge to Swift Combine/Async-Await.
+     */
     @NativeCoroutinesState
     val objects: StateFlow<List<MuseumObject>> =
         museumRepository.getObjects()
+            // Keep the subscription active for 5 seconds after the last collector disconnects
+            // Starts with an empty list as the initial state
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

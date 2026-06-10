@@ -41,15 +41,26 @@ import com.jetbrains.kmpapp.R
 import com.jetbrains.kmpapp.data.MuseumObject
 import org.koin.compose.viewmodel.koinViewModel
 
+/**
+ * A Composable screen that displays the detailed information of a selected museum object.
+ *
+ * @param objectId The ID of the museum object to fetch and display.
+ * @param navigateBack A callback to navigate the user back to the list screen.
+ */
 @Composable
 fun DetailScreen(objectId: Int, navigateBack: () -> Unit) {
+    // Injects the shared KMP ViewModel
     val viewModel: DetailViewModel = koinViewModel()
+    
+    // Collects the state from the ViewModel
     val obj by viewModel.museumObject.collectAsStateWithLifecycle()
 
+    // Triggers the ViewModel to fetch data whenever the objectId changes
     LaunchedEffect(objectId) {
         viewModel.setId(objectId)
     }
 
+    // Animates the transition once the object data is successfully loaded
     AnimatedContent(obj != null) { objectAvailable ->
         if (objectAvailable) {
             ObjectDetails(obj!!, onBackClick = navigateBack)
@@ -59,17 +70,22 @@ fun DetailScreen(objectId: Int, navigateBack: () -> Unit) {
     }
 }
 
+/**
+ * A Composable that renders the actual object details and an AppBar.
+ */
 @Composable
 private fun ObjectDetails(
     obj: MuseumObject,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Scaffold provides the standard Material structural layout
     Scaffold(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
                 title = {},
+                // Back button to trigger the navigation callback
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
@@ -79,11 +95,13 @@ private fun ObjectDetails(
         },
         modifier = modifier.windowInsetsPadding(WindowInsets.systemBars),
     ) { paddingValues ->
+        // Makes the column vertically scrollable to accommodate long content
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
                 .padding(paddingValues)
         ) {
+            // Displays the high-resolution primary image using Coil
             AsyncImage(
                 model = obj.primaryImageSmall,
                 contentDescription = obj.title,
@@ -93,10 +111,13 @@ private fun ObjectDetails(
                     .background(Color.LightGray)
             )
 
+            // Allows the user to select and copy text
             SelectionContainer {
                 Column(Modifier.padding(12.dp)) {
                     Text(obj.title, style = MaterialTheme.typography.headlineMedium)
                     Spacer(Modifier.height(6.dp))
+                    
+                    // Displays various attributes using a helper Composable
                     LabeledInfo(stringResource(R.string.label_artist), obj.artistDisplayName)
                     LabeledInfo(stringResource(R.string.label_date), obj.objectDate)
                     LabeledInfo(stringResource(R.string.label_dimensions), obj.dimensions)
@@ -110,6 +131,9 @@ private fun ObjectDetails(
     }
 }
 
+/**
+ * A helper Composable that formats and displays a label in bold followed by its value.
+ */
 @Composable
 private fun LabeledInfo(
     label: String,
@@ -118,6 +142,7 @@ private fun LabeledInfo(
 ) {
     Column(modifier.padding(vertical = 4.dp)) {
         Spacer(Modifier.height(6.dp))
+        // Uses buildAnnotatedString to style parts of the text differently
         Text(
             buildAnnotatedString {
                 withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
