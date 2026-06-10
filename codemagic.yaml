@@ -2,31 +2,42 @@ workflows:
   ios-kmp-windows-user:
     name: Build Unsigned iOS IPA for Windows Sideloading
     max_build_duration: 40
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     environment:
       vars:
-        # Pointing to the main outer folder containing your .xcodeproj file
-        XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
+        XCODE_PROJECT: "iosApp/iosApp.xcodeproj" 
         XCODE_SCHEME: "iosApp"
     scripts:
-      - name: Build KMP Shared Module
+      - name: Initialize Gradle Wrapper
         script: |
-          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
-      - name: Build Unsigned iOS App Binary
+          chmod +x gradlew
+          ./gradlew --version
+      - name: Resolve Swift Package Dependencies
         script: |
           xcodebuild -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
+            -resolvePackageDependencies \
+            -clonedSourcePackagesDirPath SourcePackages
+      - name: Build Unsigned iOS App Binary
+        script: |
+          # Build with ad-hoc signing so the binary structure is valid for AltStore to re-sign
+          xcodebuild build -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
             -sdk iphoneos \
             -configuration Release \
-            CODE_SIGNING_ALLOWED=NO \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -derivedDataPath build/ios/DerivedData \
+            CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            BUILD_DIR=build/ios/unsigned
+            CODE_SIGN_IDENTITY="-" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO
       - name: Package into IPA Container
         script: |
+          APP_PATH=$(find build/ios/DerivedData/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -1)
           mkdir -p build/ios/ipa/Payload
-          cp -r build/ios/unsigned/Release-iphoneos/*.app build/ios/ipa/Payload/
-          cd build/ios/ipa
-          zip -r unsigned_app.ipa Payload
+          cp -r "$APP_PATH" build/ios/ipa/Payload/
+          # Use ditto (Apple's tool) to create a properly structured IPA
+          ditto -c -k --sequesterRsrc --keepParent build/ios/ipa/Payload build/ios/ipa/unsigned_app.ipa
     artifacts:
       - build/ios/ipa/*.ipa
