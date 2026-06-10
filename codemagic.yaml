@@ -14,23 +14,25 @@ workflows:
           ./gradlew --version
       - name: Resolve Swift Package Dependencies
         script: |
-          # Force Xcode to download and link SPM packages before building
           xcodebuild -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -resolvePackageDependencies
       - name: Build Unsigned iOS App Binary
         script: |
-          xcodebuild -project "$XCODE_PROJECT" \
+          # Use 'build' instead of archive to circumvent final profile checks
+          xcodebuild build -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -sdk iphoneos \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             BUILD_DIR=build/ios/unsigned
       - name: Package into IPA Container
         script: |
           mkdir -p build/ios/ipa/Payload
+          # Dynamic copy path to catch the generated target binary folder name
           cp -r build/ios/unsigned/Release-iphoneos/*.app build/ios/ipa/Payload/
           cd build/ios/ipa
           zip -r unsigned_app.ipa Payload
