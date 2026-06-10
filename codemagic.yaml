@@ -2,7 +2,7 @@ workflows:
   ios-kmp-windows-user:
     name: Build Unsigned iOS IPA for Windows Sideloading
     max_build_duration: 40
-    instance_type: mac_mini_m2
+    instance_type: mac_mini_m1
     environment:
       vars:
         # Pointing to the main outer folder containing your .xcodeproj file
